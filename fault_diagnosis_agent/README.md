@@ -23,6 +23,3 @@
 2. 配置环境变量: 根目录新建 `.env` 文件，写入 `DEEPSEEK_API_KEY=sk-xxxxxxx`
 3. 启动后端服务: `uvicorn backend.api:app --host 127.0.0.1 --port 8000 --reload`
 4. 访问系统: 浏览器打开 `http://127.0.0.1:8000`
-
-## 📝 目录结构
-(此处可复制你本地的目录树贴入)
