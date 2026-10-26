@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>工业设备故障诊断多Agent系统</title>
+    <script src="https://cdn.bootcdn.net/ajax/libs/marked/11.1.1/marked.min.js"></script>
+<style>
+    * { box-sizing: border-box; }
+    body {
+        font-family: "Microsoft YaHei", sans-serif;
+        background: #f4f6f8;
+        margin: 0; padding: 30px;
+        color: #333;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { font-size: 22px; color: #1a3d6d; border-left: 5px solid #1a3d6d; padding-left: 12px; }
+    .card {
+        background: #fff; border-radius: 8px;
+        padding: 20px; margin-bottom: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    textarea {
+        width: 100%; min-height: 110px; padding: 12px;
+        border: 1px solid #d0d7de; border-radius: 6px;
+        font-size: 14px; font-family: inherit; resize: vertical;
+    }
+    button {
+        margin-top: 12px; padding: 10px 26px;
+        background: #1a3d6d; color: #fff; border: none;
+        border-radius: 6px; font-size: 15px; cursor: pointer;
+    }
+    button:disabled { background: #8fa3bd; cursor: not-allowed; }
+    .severity-tag {
+        display: inline-block; padding: 2px 10px; border-radius: 12px;
+        font-size: 12px; color: #fff; margin-left: 8px;
+    }
+    .sev-高 { background: #d9363e; }
+    .sev-中 { background: #e8a33d; }
+    .sev-低 { background: #52a852; }
+    .section-title {
+        font-weight: bold; color: #1a3d6d;
+        margin: 14px 0 8px; font-size: 15px;
+        border-bottom: 1px dashed #d0d7de; padding-bottom: 4px;
+    }
+    .tag-list span {
+        display: inline-block; background: #eef3fa; color: #1a3d6d;
+        padding: 3px 10px; border-radius: 4px; margin: 3px 6px 3px 0; font-size: 13px;
+    }
+    .case-item { background: #f7f9fc; padding: 10px; border-radius: 6px; margin-bottom: 8px; font-size: 13px; line-height: 1.7; }
+    pre#solutionBox {
+        white-space: pre-wrap; word-break: break-word;
+        background: #f7f9fc; padding: 16px; border-radius: 6px;
+        font-family: "Consolas", "Microsoft YaHei"; font-size: 13px; line-height: 1.7;
+    }
+    .hidden { display: none; }
+    .loading { color: #1a3d6d; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>工业设备故障诊断多Agent系统</h1>
+
+    <div class="card">
+        <div class="section-title">🔧 输入故障描述</div>
+        <textarea id="faultInput" placeholder="例如：3号水泵最近一周运行声音异常，有明显振动，出口压力不稳定，轴承附近温度偏高……"></textarea>
+        <button id="submitBtn" onclick="runDiagnose()">开始智能诊断</button>
+        <div id="loadingHint" class="loading hidden">⏳ 智能体正在协同分析，请稍候（约 10-20 秒）...</div>
+    </div>
+
+    <div id="resultArea" class="hidden">
+        <div class="card">
+            <div class="section-title">📋 基本信息</div>
+            <div>设备类型：<b id="deviceType"></b><span id="severityTag" class="severity-tag"></span></div>
+            <div style="margin-top:8px">故障现象：<span id="phenomenon"></span></div>
+            <div class="section-title">🏷️ 关键特征</div>
+            <div id="keywords" class="tag-list"></div>
+        </div>
+
+        <div class="card">
+            <div class="section-title">📚 双引擎知识库召回</div>
+            <div style="font-size:13px;color:#666;margin-bottom:6px">历史相似案例：</div>
+            <div id="vectorCases"></div>
+            <div style="font-size:13px;color:#666;margin:10px 0 6px">图谱推理根因：</div>
+            <div id="graphCauses" class="tag-list"></div>
+        </div>
+
+        <div class="card">
+            <div class="section-title">🎯 根因分析</div>
+            <div id="rootCauses" class="tag-list"></div>
+        </div>
+
+        <div class="card">
+            <div class="section-title">🛠️ 维修方案</div>
+            <div id="solutionBox" style="background:#f7f9fc; padding:16px; border-radius:6px; font-size:13px; line-height:1.7;"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function runDiagnose() {
+    const input = document.getElementById("faultInput").value.trim();
+    if (!input) { alert("请先输入故障描述"); return; }
+
+    const btn = document.getElementById("submitBtn");
+    const hint = document.getElementById("loadingHint");
+    const resultArea = document.getElementById("resultArea");
+
+    btn.disabled = true;
+    hint.classList.remove("hidden");
+    resultArea.classList.add("hidden");
+
+    try {
+        const resp = await fetch("/api/diagnose", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fault_description: input })
+        });
+        if (!resp.ok) throw new Error("后端服务异常：" + resp.status);
+        const data = await resp.json();
+
+        // 填充基本信息
+        document.getElementById("deviceType").textContent = data.device_type;
+        const sev = document.getElementById("severityTag");
+        sev.textContent = "严重程度：" + data.severity;
+        sev.className = "severity-tag sev-" + data.severity;
+        document.getElementById("phenomenon").textContent = data.fault_phenomenon;
+        renderTags("keywords", data.keywords);
+
+        // 双引擎召回
+        renderCases("vectorCases", data.vector_cases);
+        renderTags("graphCauses", data.graph_causes);
+
+        // 根因
+        renderTags("rootCauses", data.root_causes);
+
+        // 维修方案
+       document.getElementById("solutionBox").innerHTML = marked.parse(data.solution);
+
+        resultArea.classList.remove("hidden");
+    } catch (e) {
+        alert("诊断失败：" + e.message);
+        console.error(e);
+    } finally {
+        btn.disabled = false;
+        hint.classList.add("hidden");
+    }
+}
+
+function renderTags(id, arr) {
+    const el = document.getElementById(id);
+    el.innerHTML = "";
+    (arr || []).forEach(t => {
+        const s = document.createElement("span");
+        s.textContent = t;
+        el.appendChild(s);
+    });
+}
+
+function renderCases(id, arr) {
+    const el = document.getElementById(id);
+    el.innerHTML = "";
+    if (!arr || arr.length === 0) {
+        el.innerHTML = '<div style="color:#999;font-size:13px">暂无相似案例</div>';
+        return;
+    }
+    arr.forEach(c => {
+        const d = document.createElement("div");
+        d.className = "case-item";
+        d.textContent = c;
+        el.appendChild(d);
+    });
+}
+</script>
+</body>
+</html>

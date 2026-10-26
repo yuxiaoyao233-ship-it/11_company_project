@@ -1,0 +1,22 @@
+{
+  "nodes": [
+    {"id": "水泵", "type": "设备"},
+    {"id": "离心泵", "type": "设备"},
+    {"id": "电机", "type": "设备"},
+    {"id": "振动大", "type": "异常现象"},
+    {"id": "轴承发热", "type": "异常现象"},
+    {"id": "联轴器对中不良", "type": "根因"},
+    {"id": "轴承磨损", "type": "根因"},
+    {"id": "基础松动", "type": "根因"}
+  ],
+  "edges": [
+    {"source": "离心泵", "target": "水泵", "relation": "属于"},
+    {"source": "电机", "target": "离心泵", "relation": "驱动"},
+    {"source": "水泵", "target": "振动大", "relation": "表现出"},
+    {"source": "水泵", "target": "轴承发热", "relation": "表现出"},
+    {"source": "振动大", "target": "联轴器对中不良", "relation": "可能由...导致"},
+    {"source": "振动大", "target": "基础松动", "relation": "可能由...导致"},
+    {"source": "轴承发热", "target": "轴承磨损", "relation": "可能由...导致"},
+    {"source": "轴承发热", "target": "联轴器对中不良", "relation": "可能由...导致"}
+  ]
+}
